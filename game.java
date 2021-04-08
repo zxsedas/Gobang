@@ -1,6 +1,13 @@
+/*
+version: 0.0.2
+功能:五子棋,可以透過! !來存檔
+*/
+import java.io.*;
+import java.nio.Buffer;
 import java.util.Scanner;
 
-class Board
+
+class Board implements Serializable
 {
     protected int range=0;
     protected Player board[][];
@@ -12,7 +19,7 @@ class Board
 
 }
 //----------------------------------------------------------------------------
-class ChessPiece
+class ChessPiece implements Serializable
 {
     protected int x, y;                                  //piece x y
     private boolean empty = true;                        //as empty bool true,  as piece black true
@@ -25,7 +32,7 @@ class ChessPiece
     }
 }
 //----------------------------------------------------------------------------
-class Player
+class Player implements Serializable
 {
     private String name;
     private ChessPiece cp;
@@ -40,8 +47,8 @@ class Player
         
         cp = new ChessPiece();
         cp.setCoordinate(x, y);
-        ChessBoard.recordBoard[x][y] = 1;
-        ChessBoard.num++; 
+        // ChessBoard.recordBoard[x][y] = 1;
+        // ChessBoard.num++; 
         
         return this;
     }
@@ -55,9 +62,9 @@ class Player
     }
 }
 //----------------------------------------------------------------------------
-class ChessBoard extends Board
+class ChessBoard extends Board implements Serializable
 {
-    protected static int recordBoard[][], num=0;                     //紀錄棋盤有沒有被下過, 目前下棋總個數   
+    protected int recordBoard[][], num=0;                     //紀錄棋盤有沒有被下過, 目前下棋總個數   
     public ChessBoard(int range)
     {
         super(range);
@@ -65,6 +72,8 @@ class ChessBoard extends Board
     }
     public void add(Player p)                                        //棋盤存放每個使用者輸入的狀況
     {    
+        recordBoard[p.get_cp().x][p.get_cp().y] = 1;
+        num++;
         board[ p.get_cp().x ][p.get_cp().y] = p;
     }
     public void display()
@@ -231,39 +240,63 @@ class ChessBoard extends Board
     }
 }
 //----------------------------------------------------------------------------
+class GameControl implements Serializable 
+{   
+    
+    private Player p[] = new Player[2];                                 //建立兩位使用者       
+    private String s[] = new String[2];                                 //存放使用者id
 
-public class game {
-    public static void main(String args[])
-    {
-        Scanner scn = new Scanner(System.in);
-        Player p[] = new Player[2];                                 //建立兩位使用者       
-        String s[] = new String[2];                                 //存放使用者id
+    protected ChessBoard cb;                                              //棋盤  
+    protected boolean color;                                              //棋子顏色
+    private int flat = 0, n=0;
+    public boolean stop = false;
 
-        ChessBoard cb;                                              //棋盤  
-        boolean color;                                              //棋子顏色
-        int flat = 0, n=0;                                          
-        //----------------------------------------------------------------------------
+    public void init() throws IOException
+    {     
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  
         for(int user=0;user<2;user++)
         {
             System.out.print("輸入第" + (user+1) + "位使用者名稱:");
-            s[user] = scn.next();
-            System.out.print("輸入黑白棋顏色,黑為true 白為false:");
-            color = scn.nextBoolean();
+            s[user] = br.readLine();
+            if(user == 0)
+            {
+                System.out.print("輸入黑白棋顏色,黑為true 白為false:");
+                color = Boolean.parseBoolean(br.readLine());
+                p[user] = new Player(s[user],color);
+            }    
+            else if(user == 1)
+            {
+                p[user] = new Player(s[user],!color);
+            }
             
-            p[user] = new Player(s[user],color);
         }
         //----------------------------------------------------------------------------
         System.out.print("設定n*n的棋盤,請輸入單一個n值:");
-        n = scn.nextInt();
+        n = Integer.parseInt(br.readLine());
         cb = new ChessBoard(n);
         //----------------------------------------------------------------------------
+    } 
+    public void run() throws IOException
+    {     
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  
         while(true)
         {
             cb.display();
-            System.out.print(s[flat] + "請輸入第x,y的棋子位置:");
-            int x = scn.nextInt();
-            int y = scn.nextInt();
-            if(ChessBoard.recordBoard[x][y] == 1)
+            System.out.print(s[flat] + "請輸入第x,y的棋子位置 或 ! !來存檔:");
+            
+            String coord = br.readLine();
+            
+            
+            if(coord.charAt(0) == '!' && coord.charAt(2) == '!')
+            {
+                stop = true;
+                break;
+            }
+            
+            int intX = Integer.parseInt(Character.toString(coord.charAt(0)));
+            int intY = Integer.parseInt(Character.toString(coord.charAt(2)));
+            
+            if(cb.recordBoard[intX][intY] == 1)
             {
                 System.out.println("此位置已被下過,請重新選擇!!");
                 continue;
@@ -272,12 +305,12 @@ public class game {
             if(flat == 0)                                          //輪流輸入
             {
                 
-                cb.add( p[flat].addChessPiece(x, y));
+                cb.add( p[flat].addChessPiece(intX, intY));
                  
             }
             else
             {
-                cb.add( p[flat].addChessPiece(x, y));
+                cb.add( p[flat].addChessPiece(intX, intY));
             }
             //----------------------------------------------------------------------------
             if(cb.check() == 1)                            //user 1 win
@@ -302,7 +335,53 @@ public class game {
                 flat=1;
         }
         cb.display();
-        System.out.println("Game over!!!");
+        if(stop == false)
+            System.out.println("Game over!!!");
+        else
+        
+            System.out.println("Game stop!!!");
+        
+            
+    }
+    public boolean stop()
+    {
+        return stop == true;
+    }
+}
+public class game 
+{
+    public static void main(String args[]) throws IOException, ClassNotFoundException
+    {
+        ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("gamelog"));
+        GameControl g = new GameControl();
+        g.init();
+        g.run();
+        
+        if(g.stop())
+        {
+            oos.writeObject(g);
+            System.out.println("game save!");
+            g.stop = false;
+        }
+        oos.flush();
+        oos.close();
+        //---------------------------------------------
+        ObjectInputStream ois = new ObjectInputStream(new FileInputStream("gamelog"));
+        GameControl g1 = new GameControl();
+        System.out.println("讀檔成功");
+        try{
+            while(true)
+            {
+                g1 =(GameControl) ois.readObject();
+                
+            }
+        }
+        catch(EOFException e)
+        {
+            g1.run();
+            ois.close();
+        }
+        
     }
     
 }
